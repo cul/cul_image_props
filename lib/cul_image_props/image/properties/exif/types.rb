@@ -56,7 +56,7 @@ class Ratio
     def inspect
         self.reduce()
         if @den == 1
-            return str(self.num)
+            return self.num.to_s
         end
         return format("%d/%d", @num, @den)
     end
@@ -73,8 +73,7 @@ end
 # for ease of dealing with tags
 class IFD_Tag
     attr_accessor :printable, :tag, :field_type, :values, :field_offset, :field_length
-    def initialize( printable, tag, field_type, values, field_offset,
-                 field_length)
+    def initialize( printable, tag, field_type, values, field_offset, field_length)
         # printable version of data
         @printable = printable
         # tag ID number
@@ -122,24 +121,50 @@ class EXIF_header
         @tags = {}
     end
 
-# extract multibyte integer in Motorola format (little endian)
-    def s2n_motorola(str)
+# extract multibyte integer in Motorola format (big/network endian)
+    def s2n_motorola(src)
         x = 0
-        str.each_byte { |c|
-            x = (x << 8) | c
-        }
-        return x
+        l = src.length
+        if l == 1
+          return src[0]
+        elsif l == 2
+          return src.unpack('n')[0]
+        elsif l == 4
+          return src.unpack('N')[0]
+        else
+          raise "Unexpected packed Fixnum length: " + src.length.to_s
+        end
     end
-# extract multibyte integer in Intel format (big endian)
-    def s2n_intel(str)
+# extract multibyte integer in Intel format (little endian)
+    def s2n_intel(src)
         x = 0
         y = 0
-        str.each_byte { |c|
-            x = x | (c << y)
-            y = y + 8
-        }
-        return x
+        if l == 1
+          return src[0]
+        elsif l == 2
+          return src.unpack('v')[0]
+        elsif l == 4 
+          return src.unpack('V')[0]
+        else
+          raise "Unexpected packed Fixnum length: " + src.length.to_s
+        end
       end
+
+    def unpack_number(src, signed=false)
+        if @endian == 'I'
+            val=s2n_intel(src)
+        else
+            val=s2n_motorola(src)
+        end
+        # Sign extension ?
+        if signed
+            msb= 1 << (8*length-1)
+            if val & msb
+                val=val-(msb << 1)
+            end
+        end
+        return val
+    end
 
     # convert slice to integer, based on sign and endian flags
     # usually this offset is assumed to be relative to the beginning of the
@@ -147,6 +172,11 @@ class EXIF_header
     # this offset may be relative to some other starting point.
     def s2n(offset, length, signed=false)
         @file.seek(@offset+offset)
+        if @file.eof? and length != 0
+          # raise "Read past EOF"
+          puts "Read past EOF"
+          return 0
+        end
         slice=@file.read(length)
         if @endian == 'I'
             val=s2n_intel(slice)
@@ -179,13 +209,16 @@ class EXIF_header
 
     # return first IFD
     def first_IFD()
-        return s2n(4, 4)
+        @file.seek(@offset + 4)
+        return unpack_number(@file.read(4))
     end
 
     # return pointer to next IFD
     def next_IFD(ifd)
-        entries=self.s2n(ifd, 2)
-        return self.s2n(ifd+2+12*entries, 4)
+        @file.seek(@offset + ifd)
+        entries = unpack_number(@file.read(2))
+        @file.seek((12*entries), IO::SEEK_CUR)
+        return unpack_number(@file.read(4))
     end
 
     # return list of IFDs in header
@@ -200,28 +233,39 @@ class EXIF_header
     end
 
     # return list of entries in this IFD
-    def dump_IFD(ifd, ifd_name, dict=EXIF_TAGS, relative=0, stop_tag='UNDEF')
-        entries=self.s2n(ifd, 2)
+#    def dump_IFD(ifd, ifd_name, dict=EXIF_TAGS, relative=false, stop_tag='UNDEF')
+    def dump_IFD(ifd, ifd_name, opts)
+        opts = {:dict => EXIF_TAGS, :relative => false, :stop_tag => 'UNDEF'}.merge(opts)
+        dict = opts[:dict]
+        relative = opts[:relative]
+        stop_tag = opts[:stop_tag]
+        @file.seek(@offset + ifd)
+        entries = unpack_number(@file.read(2))
+        entries_ptr = ifd + 2
         puts ifd_name + " had zero entries!" if entries == 0
         (0 ... entries).each { |i|
             # entry is index of start of this IFD in the file
-            entry = ifd + 2 + 12 * i
-            tag = self.s2n(entry, 2)
+            entry = ifd + 2 + (12 * i)
+            @file.seek(@offset + entry)
+            tag_id = unpack_number(@file.read(2))
 
             # get tag name early to avoid errors, help debug
-            tag_entry = dict[tag]
+            tag_entry = dict[tag_id]
             if tag_entry
                 tag_name = tag_entry.name
             else
-                tag_name = 'Tag 0x%04X' % tag
+                tag_name = 'Tag 0x%04X' % tag_id
             end
 
             # ignore certain tags for faster processing
-            if not (not @detail and IGNORE_TAGS.include? tag)
-                field_type = self.s2n(entry + 2, 2)
+            if not (not @detail and IGNORE_TAGS.include? tag_id)
+                # The 12 byte Tag format is ID (short) TYPE (short) COUNT (long) VALUE (long)
+                # if actual values would exceed 4 bytes (long), VALUE
+                # is instead a pointer to the actual values.
+                field_type = unpack_number(@file.read(2))
                 
                 # unknown field type
-                if 0 > field_type or field_type > FIELD_TYPES.length
+                if 0 > field_type or field_type >= FIELD_TYPES.length
                     if not self.strict
                         next
                     else
@@ -229,38 +273,28 @@ class EXIF_header
                     end
                 end
                 typelen = FIELD_TYPES[field_type][0]
-                count = self.s2n(entry + 4, 4)
-                # Adjust for tag id/type/count (2+2+4 bytes)
-                # Now we point at either the data or the 2nd level offset
-                offset = entry + 8
+                count = unpack_number(@file.read(4))
 
-                # If the value fits in 4 bytes, it is inlined, else we
-                # need to jump ahead again.
-                if count * typelen > 4
-                    # offset is not the value; it's a pointer to the value
-                    # if relative we set things up so s2n will seek to the right
-                    # place when it adds self.offset.  Note that this 'relative'
-                    # is for the Nikon type 3 makernote.  Other cameras may use
-                    # other relative offsets, which would have to be computed here
-                    # slightly differently.
+                # If the value exceeds 4 bytes, it is a pointer to values.
+                if (count * typelen) > 4
+                    # Note that 'relative' is a fix for the Nikon type 3 makernote.
+                    field_offset = unpack_number(@file.read(4))
                     if relative
-                        tmp_offset = self.s2n(offset, 4)
-                        offset = tmp_offset + ifd - 8
+                        field_offset = field_offset + ifd - 8
                         if @fake_exif
-                            offset = offset + 18
+                            field_offset = field_offset + 18
                         end
-                    else
-                        offset = self.s2n(offset, 4)
                     end
+                else
+                  field_offset = entry + 8
                 end
 
-                field_offset = offset
                 if field_type == 2
                     # special case => null-terminated ASCII string
                     # XXX investigate
                     # sometimes gets too big to fit in int value
                     if count != 0 and count < (2**31)
-                        @file.seek(self.offset + offset)
+                        @file.seek(@offset + field_offset)
                         values = @file.read(count)
                         #print values
                         # Drop any garbage after a null.
@@ -272,28 +306,20 @@ class EXIF_header
                     values = []
                     signed = [6, 8, 9, 10].include? field_type
                     
-                    # XXX investigate
-                    # some entries get too big to handle could be malformed
-                    # file or problem with self.s2n
-                    if count < 1000
+                    # @todo investigate
+                    # some entries get too big to handle could be malformed file
+                    if count < 1000 or tag_name == 'MakerNote'
+                        @file.seek(@offset + field_offset)
                         count.times {
+                            puts FIELD_TYPES[field_type].name
                             if field_type == 5 or field_type == 10
                                 # a ratio
-                                value = Ratio.new(self.s2n(offset, 4, signed),
-                                              self.s2n(offset + 4, 4, signed))
+                                value = Ratio.new(unpack_number(@file.read(4), signed),
+                                              unpack_number(@file.read(4), signed) )
                             else
-                                value = self.s2n(offset, typelen, signed)
+                                value = unpack_number(@file.read(typelen), signed)
                             end
                             values << value
-                            offset = offset + typelen
-                        }
-                    # The test above causes problems with tags that are 
-                    # supposed to have long values!  Fix up one important case.
-                    elsif tag_name == 'MakerNote'
-                        count.times {
-                            value = self.s2n(offset, typelen, signed)
-                            values << value
-                            offset = offset + typelen
                         }
                     end
                 end
@@ -322,7 +348,7 @@ class EXIF_header
                      end
                 end
                 puts ifd_name + ' ' + tag_name + " == " + values.inspect
-                self.tags[ifd_name + ' ' + tag_name] = IFD_Tag.new(printable, tag,
+                self.tags[ifd_name + ' ' + tag_name] = IFD_Tag.new(printable, tag_id,
                                                           field_type,
                                                           values, field_offset,
                                                           count * typelen)
@@ -429,31 +455,31 @@ class EXIF_header
         if make.include? 'NIKON'
             if note.values[0,7] == [78, 105, 107, 111, 110, 0, 1]
                 self.dump_IFD(note.field_offset+8, 'MakerNote',
-                              MAKERNOTE_NIKON_OLDER_TAGS)
+                              :dict=>MAKERNOTE_NIKON_OLDER_TAGS)
             elsif note.values[0, 7] == [78, 105, 107, 111, 110, 0, 2]
                 if note.values[12,2] != [0, 42] and note.values[12,2] != [42, 0]
                     raise "Missing marker tag '42' in MakerNote."
                 end
                 # skip the Makernote label and the TIFF header
                 self.dump_IFD(note.field_offset+10+8, 'MakerNote',
-                              MAKERNOTE_NIKON_NEWER_TAGS, :relative=>1)
+                              :dict=>MAKERNOTE_NIKON_NEWER_TAGS, :relative=>true)
             else
                 # E99x or D1
                 self.dump_IFD(note.field_offset, 'MakerNote',
-                              MAKERNOTE_NIKON_NEWER_TAGS)
+                              :dict=>MAKERNOTE_NIKON_NEWER_TAGS)
             end
             return
         end
         # Olympus
         if make.index('OLYMPUS') == 0
             self.dump_IFD(note.field_offset+8, 'MakerNote',
-                          MAKERNOTE_OLYMPUS_TAGS)
+                          :dict=>MAKERNOTE_OLYMPUS_TAGS)
             return
         end
         # Casio
         if make.include? 'CASIO' or make.include? 'Casio'
             self.dump_IFD(note.field_offset, 'MakerNote',
-                          MAKERNOTE_CASIO_TAGS)
+                          :dict=>MAKERNOTE_CASIO_TAGS)
             return
         end
         # Fujifilm
@@ -467,7 +493,7 @@ class EXIF_header
             offset = self.offset
             self.offset += note.field_offset
             # process note with bogus values (note is actually at offset 12)
-            self.dump_IFD(12, 'MakerNote', MAKERNOTE_FUJIFILM_TAGS)
+            self.dump_IFD(12, 'MakerNote', :dict=>MAKERNOTE_FUJIFILM_TAGS)
             # reset to correct values
             self.endian = endian
             self.offset = offset
@@ -476,7 +502,7 @@ class EXIF_header
         # Canon
         if make == 'Canon'
             self.dump_IFD(note.field_offset, 'MakerNote',
-                          MAKERNOTE_CANON_TAGS)
+                          :dict=>MAKERNOTE_CANON_TAGS)
             [['MakerNote Tag 0x0001', MAKERNOTE_CANON_TAG_0x001],
                       ['MakerNote Tag 0x0004', MAKERNOTE_CANON_TAG_0x004]].each { |i|
                 begin

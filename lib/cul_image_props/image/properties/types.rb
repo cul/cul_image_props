@@ -124,23 +124,23 @@ class Jpeg < Base
     raise "Source file is not a jpeg" unless header_bytes[0...2] == Cul::Image::Magic::JPEG
     xpix = 0
     ypix = 0
-    while (!srcfile.eof?)
-      if "\xFF" == srcfile.read(1)
-        mrkr = "\xFF" + srcfile.read(1)
-        blen = srcfile.read(2).unpack('n')[0]
+    while (!@src.eof?)
+      if "\xFF" == @src.read(1)
+        mrkr = "\xFF" + @src.read(1)
+        blen = @src.read(2).unpack('n')[0]
         if JPEG_FRAME_MARKERS.include? mrkr  # SOFn, Start of frame for scans
-          srcfile.read(1) #skip bits per sample
-          self.length= srcfile.read(2).unpack('n')[0]
-          self.width= srcfile.read(2).unpack('n')[0]
-          srcfile.seek(0, IO::SEEK_END)
+          @src.read(1) #skip bits per sample
+          self.length= @src.read(2).unpack('n')[0]
+          self.width= @src.read(2).unpack('n')[0]
+          @src.seek(0, IO::SEEK_END)
         end
       else
-        srcfile.seek(0, IO::SEEK_END)
+        @src.seek(0, IO::SEEK_END)
       end
     end
 
     @src.rewind
-    tags = Cul::Image::Properties::Exif.process_file(srcfile)
+    tags = Cul::Image::Properties::Exif.process_file(@src)
     if tags.include? 'Image ImageWidth'
       self.width= tags['Image ImageWidth'].values[0]
     end

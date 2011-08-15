@@ -77,13 +77,44 @@ describe "Cul::Image::Properties" do
           compare_property_nodesets(@properties, actual.nodeset).should == true
         end
 
-        it "should map RDF property names to property nodes" do
+      describe "should map RDF property names to property nodes" do
+        it "for extent" do
           actual = Cul::Image::Properties.identify(@img)
           prop = actual['http://purl.org/dc/terms/extent']
           prop.nil?.should == false
           prop.should == '15138'
         end
-      end
+        it "for length" do
+          actual = Cul::Image::Properties.identify(@img)
+          prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageLength']
+          prop.nil?.should == false
+          prop.should == '234'
+        end
+        it "for width" do
+          actual = Cul::Image::Properties.identify(@img)
+          prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageWidth']
+          prop.nil?.should == false
+          prop.should == '313'
+        end
+        it "for sampling unit" do
+          actual = Cul::Image::Properties.identify(@img)
+          prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/samplingFrequencyUnit']
+          prop.nil?.should == false
+          prop.should == 'http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/InchSampling'
+        end
+        it "for x sampling frequencies" do
+          actual = Cul::Image::Properties.identify(@img)
+          prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/xSamplingFrequency']
+          prop.nil?.should == false
+          prop.should == '72'
+        end
+        it "for y sampling frequencies" do
+          actual = Cul::Image::Properties.identify(@img)
+          prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/ySamplingFrequency']
+          prop.nil?.should == false
+          prop.should == '72'
+        end
+      end      end
 
       describe "jpeg-2" do
         before(:each) do

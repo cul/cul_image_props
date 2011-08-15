@@ -28,14 +28,14 @@ def self.process_file(f, opts={})
         f.seek(0)
         endian = data[0,1]
         offset = 0
-    elsif data[0,2] == '\xFF\xD8'
+    elsif data[0,2] == "\xFF\xD8"
         # it's a JPEG file
         base = 0
-        while data[2] == '\xFF' and ['JFIF', 'JFXX', 'OLYM', 'Phot'].include? data[6, 4]
+        while data[2] == "\xFF" and ['JFIF', 'JFXX', 'OLYM', 'Phot'].include? data[6, 4]
             length = ord(data[4])*256+data[5]
             f.read(length-8)
             # fake an EXIF beginning of file
-            data = '\xFF\x00'+f.read(10)
+            data = "\xFF\x00"+f.read(10)
             fake_exif = 1
             base = base + length
         end
@@ -46,48 +46,52 @@ def self.process_file(f, opts={})
         base = 2
         fptr = base
         while true
-            if data[fptr,2]=='\xFF\xE1'
-                # APP1
+            if data[fptr,2]=="\xFF\xE1"
+                puts " APP1 "
                 if data[fptr+4,4] == "Exif"
                     base = fptr-2
                     break
                 end
                 fptr=fptr+ord(data[fptr+2])*256+ord(data[fptr+3])+2
-            elsif data[fptr,2]=='\xFF\xE2'
+            elsif data[fptr,2]=="\xFF\xE2"
                 # APP2
                 fptr=fptr+ord(data[fptr+2])*256+ord(data[fptr+3])+2
-            elsif data[fptr,2]=='\xFF\xE0'
+            elsif data[fptr,2]=="\xFF\xE0"
                 # APP0
                 offset = fptr
-                fptr=fptr+ord(data[fptr+2])*256+ord(data[fptr+3])+2
+                fptr += 2
+                fptr += data[fptr,2].unpack('n')[0]
+                #fptr=fptr+(data[fptr+2]*256)+ord(data[fptr+3])+2
 
-                exif = EXIF_TAGS.get(0x0128)
-                label = 'Image ' + exif[0]
-                if (data[offset+11] == '\x00')
-                    jfif[label] = IFD_Tag(field_offset=offset+11,field_length=1,printable=exif[1].get(1),tag=label,field_type=3,values=[1])
-                elsif (data[offset+11] == '\x01')
-                    jfif[label] = IFD_Tag(field_offset=offset+11,field_length=1,printable=exif[1].get(2),tag=label,field_type=3,values=[2])
-                elsif (data[offset+11] == '\x02')
-                    jfif[label] = IFD_Tag(field_offset=offset+11,field_length=1,printable=exif[1].get(3),tag=label,field_type=3,values=[3])
+                exif = EXIF_TAGS[0x0128]
+                label = 'Image ' + exif.name
+                if (data[offset+11] == "\x00")
+                    jfif[label] = IFD_Tag.new(exif.value[1],label,3,[0],offset+11,1)
+                elsif (data[offset+11] == "\x01")
+                    jfif[label] = IFD_Tag.new(exif.value[2],label,3,[0],offset+11,1)
+                elsif (data[offset+11] == "\x02")
+                    jfif[label] = IFD_Tag.new(exif.value[3],label,3,[0],offset+11,1)
                 else
-                    jfif[label] = IFD_Tag(field_offset=offset+11,field_length=1,printable="Unknown",tag=label,field_type=3,values=[0])
+                    jfif[label] = IFD_Tag.new("Unknown",label,3,[0],offset+11,1)
                 end
-                xres = ord(data[offset+12])*256+ord(data[offset+13])
-                yres = ord(data[offset+14])*256+ord(data[offset+15])
-                exif = EXIF_TAGS.get(0x011a)
-                label = 'Image ' + EXIF_TAGS.get(0x011a)[0]
-                jfif[label] = IFD_Tag(field_offset=offset+12,field_length=2,printable=xres.to_s,tag=label,field_type=5,values=[xres])
-                label = 'Image ' + EXIF_TAGS.get(0x011b)[0]
-                jfif[label] = IFD_Tag(field_offset=offset+13,field_length=2,printable=yres.to_s,tag=label,field_type=5,values=[yres])
+                xres = data[offset+12,2].unpack('n')[0]
+                yres = data[offset+14,2].unpack('n')[0]
+                exif = EXIF_TAGS[0x011a]
+                label = 'Image ' + EXIF_TAGS[0x011a].name
+                jfif[label] = IFD_Tag.new(xres.to_s,label,5,[xres],offset+12,2)
+                label = 'Image ' + EXIF_TAGS[0x011b].name
+                jfif[label] = IFD_Tag.new(yres.to_s,label,5,[yres],offset+13,2)
             else
-                if(len(data) < fptr + 2)
+                if(data.length < fptr + 2)
                     break
                 end
-                _next = data.find('\xff',fptr + 2,-2)
-                while (_next != -1 and data[_next + 1] == 0x00)
-                    _next = data.find('\xff',_next + 2,-2)
+                _next = data.index("\xff",fptr + 2)
+                _next = nil if !_next.nil? and _next + 2 >= data.length
+                while (!_next.nil? and data[_next + 1] == 0x00)
+                    _next = data.index("\xff",_next + 2)
+                    _next = nil if !_next.nil? and _next + 2 >= data.length
                 end
-                if (_next != -1)
+                unless (_next.nil?)
                    fptr = _next
                 else
                    break
@@ -130,22 +134,22 @@ def self.process_file(f, opts={})
         else
             ifd_name = 'IFD %d' % ctr
         end
-        hdr.dump_IFD(i, ifd_name, EXIF_TAGS, 0, stop_tag)
+        hdr.dump_IFD(i, ifd_name, {:dict=>EXIF_TAGS, :relative=>false, :stop_tag=>stop_tag})
         # EXIF IFD
         exif_off = hdr.tags[ifd_name +' ExifOffset']
         if exif_off
-            hdr.dump_IFD(exif_off.values[0], 'EXIF', EXIF_TAGS, 0, stop_tag)
+            hdr.dump_IFD(exif_off.values[0], 'EXIF', {:dict=>EXIF_TAGS, :relative=>false, :stop_tag =>stop_tag})
             # Interoperability IFD contained in EXIF IFD
             intr_off = hdr.tags['EXIF SubIFD InteroperabilityOffset']
             if intr_off
                 hdr.dump_IFD(intr_off.values[0], 'EXIF Interoperability',
-                             INTR_TAGS, 0, stop_tag)
+                             :dict=>INTR_TAGS, :relative=>false, :stop_tag =>stop_tag)
             end
         end
         # GPS IFD
         gps_off = hdr.tags[ifd_name+' GPSInfo']
         if gps_off
-            hdr.dump_IFD(gps_off.values[0], 'GPS', GPS_TAGS, 0, stop_tag)
+            hdr.dump_IFD(gps_off.values[0], 'GPS', {:dict=>GPS_TAGS, :relative=>false, :stop_tag =>stop_tag})
         end
         ctr += 1
     }
