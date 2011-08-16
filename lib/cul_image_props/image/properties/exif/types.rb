@@ -311,7 +311,6 @@ class EXIF_header
                     if count < 1000 or tag_name == 'MakerNote'
                         @file.seek(@offset + field_offset)
                         count.times {
-                            puts FIELD_TYPES[field_type].name
                             if field_type == 5 or field_type == 10
                                 # a ratio
                                 value = Ratio.new(unpack_number(@file.read(4), signed),
@@ -347,7 +346,6 @@ class EXIF_header
                         end
                      end
                 end
-                puts ifd_name + ' ' + tag_name + " == " + values.inspect
                 self.tags[ifd_name + ' ' + tag_name] = IFD_Tag.new(printable, tag_id,
                                                           field_type,
                                                           values, field_offset,

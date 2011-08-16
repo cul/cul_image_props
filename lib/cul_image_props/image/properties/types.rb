@@ -120,7 +120,7 @@ end
 class Jpeg < Base
   def initialize(srcfile=nil)
     super
-    header_bytes = @src.read(13)
+    header_bytes = @src.read(2)
     raise "Source file is not a jpeg" unless header_bytes[0...2] == Cul::Image::Magic::JPEG
     xpix = 0
     ypix = 0
@@ -128,11 +128,13 @@ class Jpeg < Base
       if "\xFF" == @src.read(1)
         mrkr = "\xFF" + @src.read(1)
         blen = @src.read(2).unpack('n')[0]
-        if JPEG_FRAME_MARKERS.include? mrkr  # SOFn, Start of frame for scans
+        if Cul::Image::Magic::JPEG_FRAME_MARKERS.include? mrkr  # SOFn, Start of frame for scans
           @src.read(1) #skip bits per sample
           self.length= @src.read(2).unpack('n')[0]
           self.width= @src.read(2).unpack('n')[0]
           @src.seek(0, IO::SEEK_END)
+        else
+          @src.seek(blen - 2, IO::SEEK_CUR)
         end
       else
         @src.seek(0, IO::SEEK_END)

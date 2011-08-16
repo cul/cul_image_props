@@ -100,7 +100,7 @@ describe "Cul::Image::Properties" do
           actual = Cul::Image::Properties.identify(@img)
           prop = actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/samplingFrequencyUnit']
           prop.nil?.should == false
-          prop.should == 'http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/InchSampling'
+          prop.should == 'http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/NoAbsoluteSampling'
         end
         it "for x sampling frequencies" do
           actual = Cul::Image::Properties.identify(@img)

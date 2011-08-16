@@ -4,7 +4,7 @@
  xmlns:dcmi="http://purl.org/dc/terms/">
 <si-assess:xSamplingFrequency>72</si-assess:xSamplingFrequency>
 <si-assess:ySamplingFrequency>72</si-assess:ySamplingFrequency>
-<si-assess:samplingFrequencyUnit rdf:resource="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/InchSampling" />
+<si-assess:samplingFrequencyUnit rdf:resource="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/NoAbsoluteSampling" />
 <si-basic:imageWidth>313</si-basic:imageWidth>
 <si-basic:imageLength>234</si-basic:imageLength>
 <dcmi:extent>15138</dcmi:extent>
