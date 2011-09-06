@@ -44,7 +44,6 @@ module Properties
         puts magic_bytes.unpack('H2H2H2H2H2H2H2H2').inspect
       end
     end
-    src.close unless src.closed?
     return result
   end
 end

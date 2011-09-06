@@ -101,7 +101,6 @@ class Bmp < Base
     self.extent= srcfile.stat.size unless srcfile.nil?
     self.x_sampling_freq= (sampling[0]) # / 100).ceil
     self.y_sampling_freq= (sampling[1]) # / 100).ceil
-    @src.close
   end
 end
 
@@ -113,7 +112,6 @@ class Gif < Base
     self.width= header_bytes[6,2].unpack('v')[0]
     self.length= header_bytes[8,2].unpack('v')[0]
     self.extent= srcfile.stat.size unless srcfile.nil?
-    @src.close
   end
 end
 
@@ -165,7 +163,6 @@ class Jpeg < Base
       end
     end
     self.extent= srcfile.stat.size unless srcfile.nil?
-    @src.close
   end
 end
 
@@ -191,7 +188,6 @@ class Png < Base
       end
     end
     self.extent= srcfile.stat.size unless srcfile.nil?
-    @src.close
   end
   def pHYs(len)
     val = @src.read(9)
@@ -314,7 +310,6 @@ class Tiff < Base
     end
     # do stuff with tags
     self.extent= srcfile.stat.size unless srcfile.nil?
-    @src.close
   end
 end
 
