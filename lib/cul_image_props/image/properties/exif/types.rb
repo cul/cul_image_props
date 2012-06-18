@@ -132,13 +132,13 @@ class EXIF_header
         elsif l == 4
           return src.unpack('N')[0]
         else
-          raise "Unexpected packed Fixnum length: " + src.length.to_s
+          raise "Unexpected packed Fixnum length: " + l.to_s
         end
     end
 # extract multibyte integer in Intel format (little endian)
     def s2n_intel(src)
         x = 0
-        y = 0
+        l = src.length
         if l == 1
           return src[0]
         elsif l == 2
@@ -146,7 +146,7 @@ class EXIF_header
         elsif l == 4 
           return src.unpack('V')[0]
         else
-          raise "Unexpected packed Fixnum length: " + src.length.to_s
+          raise "Unexpected packed Fixnum length: " + l.to_s
         end
       end
 
@@ -326,7 +326,7 @@ class EXIF_header
                 if count == 1 and field_type != 2
                     printable=values[0].to_s
                 elsif count > 50 and values.length > 20
-                    printable=str( values[0 =>20] )[0 =>-1] + ", ... ]"
+                    printable= "[" + values[0...20].join(',') + ", ... ]"
                 else
                     printable=values.inspect
                 end
