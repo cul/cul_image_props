@@ -6,6 +6,14 @@ module Image
 module Properties
 module Exif
 
+# return the value that should be compared to stringvalue[Fixnum] for a given number 'h'
+def self.hex_comparison_value(h)
+  ("X".respond_to? :ord) ? [h].pack('C') : h
+end
+XFF = hex_comparison_value(0xff)
+X00 = hex_comparison_value(0x00)
+X01 = hex_comparison_value(0x01)
+X02 = hex_comparison_value(0x02)
 
 # process an image file (expects an open file object)
 # this is the function that has to deal with all the arbitrary nasty bits
@@ -23,70 +31,76 @@ def self.process_file(f, opts={})
     # determine whether it's a JPEG or TIFF
     data = f.read(12)
     jfif = {}
-    if [Cul::Image::Magic::TIFF_MOTOROLA_BE, Cul::Image::Magic::TIFF_INTEL_LE].include? data[0, 4]
+    if [Cul::Image::Magic::TIFF_MOTOROLA_BE, Cul::Image::Magic::TIFF_INTEL_LE].include? data[0, 4].unpack('C*')
         f.seek(0)
         endian = data[0,1]
         offset = 0
-    elsif data[0,2] == Cul::Image::Magic::JPEG
+    elsif data[0,2].unpack('C*') == Cul::Image::Magic::JPEG
         # it's a JPEG file
         base = 0
-        while data[2] == "\xFF" and ['JFIF', 'JFXX', 'OLYM', 'Phot'].include? data[6, 4]
+        while data[2] == XFF and ['JFIF', 'JFXX', 'OLYM', 'Phot'].include? data[6, 4]
             length = data[4,2].unpack('n')[0]
             f.read(length-8)
             # fake an EXIF beginning of file
-            data = "\xFF\x00"+f.read(10)
+            data = [0xff,0x00].pack('C*') + f.read(10)
             fake_exif = 1
             base = base + length
         end
         # Big ugly patch to deal with APP2 (or other) data coming before APP1
         f.seek(0)
-        data = f.read(base+8000) # in theory, this could be insufficient --gd
+        flen = base+8000
+        data = f.read(flen) # in theory, this could be insufficient --gd
 
         base = 2
         fptr = base
         while true
-            if data[fptr,2]=="\xFF\xE1"
+            if data[fptr,2].unpack('C*') == [0xff,0xe1]
                 if data[fptr+4,4] == "Exif"
                     base = fptr-2
                     break
                 end
                 fptr += 2
                 fptr += data[fptr+2,2].unpack('n')[0]
-            elsif data[fptr,2]=="\xFF\xE2"
+            elsif data[fptr,2].unpack('C*') == [0xff,0xe2]
                 fptr += 2
                 fptr += data[fptr+2,2].unpack('n')[0]
-            elsif data[fptr,2]=="\xFF\xE0"
+            elsif data[fptr,2].unpack('C*') == [0xff,0xe0]
                 offset = fptr
                 fptr += 2
                 fptr += data[fptr,2].unpack('n')[0]
-
-                exif = EXIF_TAGS[0x0128]
+                if data.length < offset + 16
+                  lack = (offset + 16 - data.length)
+                  data.concat f.read(lack)
+                end
+                exif = EXIF_TAGS[0x0128] # resolution unit
                 label = 'Image ' + exif.name
-                if (data[offset+11] == 0x00)
-                    jfif[label] = IFD_Tag.new(exif.value[1],label,3,[0],offset+11,1)
-                elsif (data[offset+11] == 0x01)
-                    jfif[label] = IFD_Tag.new(exif.value[2],label,3,[0],offset+11,1)
-                elsif (data[offset+11] == 0x02)
-                    jfif[label] = IFD_Tag.new(exif.value[3],label,3,[0],offset+11,1)
+                if (data[offset+11] == X00)
+                  jfif[label] = IFD_Tag.new(exif.value[1],label,3,[0],offset+11,1)
+                elsif (data[offset+11] == X01)
+                  jfif[label] = IFD_Tag.new(exif.value[2],label,3,[0],offset+11,1)
+                elsif (data[offset+11] == X02)
+                  jfif[label] = IFD_Tag.new(exif.value[3],label,3,[0],offset+11,1)
                 else
-                    jfif[label] = IFD_Tag.new("Unknown",label,3,[0],offset+11,1)
+                  puts "Unknown jfif tag: #{data[offset+11]}"
+                  jfif[label] = IFD_Tag.new("Unknown",label,3,[0],offset+11,1)
                 end
                 xres= data[offset+12,2].unpack('n')[0]
                 yres= data[offset+14,2].unpack('n')[0]
-                exif = EXIF_TAGS[0x011a]
+                exif = EXIF_TAGS[0x011a] # x resolution
                 label = 'Image ' + EXIF_TAGS[0x011a].name
                 jfif[label] = IFD_Tag.new(xres.to_s,label,5,[xres],offset+12,2)
-                label = 'Image ' + EXIF_TAGS[0x011b].name
+                label = 'Image ' + EXIF_TAGS[0x011b].name # y resolution
                 jfif[label] = IFD_Tag.new(yres.to_s,label,5,[yres],offset+13,2)
             else
                 if(data.length < fptr + 2)
                     break
                 end
                 # scan for the next APP header, /\xFF(^[\x00])/
-                _next = data.index("\xff",fptr + 2)
+                ff = [0xff].pack('C')
+                _next = data.index(ff,fptr + 2)
                 _next = nil if !_next.nil? and _next + 2 >= data.length
-                while (!_next.nil? and data[_next + 1] == 0x00)
-                    _next = data.index("\xff",_next + 2)
+                while (!_next.nil? and data[_next + 1] == X00)
+                    _next = data.index(ff,_next + 2)
                     _next = nil if !_next.nil? and _next + 2 >= data.length
                 end
                 unless (_next.nil?)
@@ -97,7 +111,7 @@ def self.process_file(f, opts={})
             end
         end
         f.seek(base+12)
-        if data[2+base] == 0xFF and data[6+base, 4] == 'Exif'
+        if data[2+base] == XFF and data[6+base, 4] == 'Exif'
             # detected EXIF header
             offset = base+12 # f.tell()
             endian = f.read(1)

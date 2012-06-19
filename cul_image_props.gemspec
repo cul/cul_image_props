@@ -13,10 +13,10 @@ Gem::Specification.new do |s|
   s.description = "Library for extracting basic image properties"
   s.summary = "Library for extracting basic image properties"
 
-  # s.add_dependency('active-fedora', ">= 2.3.0")
-  s.add_development_dependency "rspec", "<2.0.0"
+  s.add_dependency('nokogiri')
+  s.add_development_dependency "rake"
+  s.add_development_dependency "rspec"
   s.add_development_dependency "mocha", ">= 0.9.8"
-  s.add_development_dependency "ruby-debug"
 
   s.files = Dir.glob("{bin,lib}/**/*")
   s.require_path = 'lib'

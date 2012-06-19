@@ -1,22 +1,23 @@
 module Cul
 module Image
 module Magic
-  BMP = "\x42\x4D"
-  GIF = "\x47\x49\x46\x38"
-  JPEG = "\xFF\xD8"
-  JPEG_FRAME_MARKERS = ["\xFF\xC0","\xFF\xC1","\xFF\xC2","\xFF\xC5","\xFF\xC6","\xFF\xC9","\xFF\xCA","\xFF\xCD","\xFF\xCE"]
+  BMP = [0x42, 0x4d] # "\x42\x4D"
+  GIF = [0x47,0x49,0x46,0x38]  # "\x47\x49\x46\x38"
+  JPEG = [0xff,0xd8] # "\xFF\xD8"
+  JFM_BYTES = [[0xff,0xc0],[0xff,0xc1],[0xff,0xc2],[0xff,0xc5],[0xff,0xc6],[0xff,0xc9],[0xff,0xca],[0xff,0xcd],[0xff,0xce]]
+  JPEG_FRAME_MARKERS = JFM_BYTES.collect {|bytes| bytes.pack('C*')}
   JPEG_SEGMENTS = {
-    "\xFF\xE0"=>"APP0",
-    "\xFF\xE1"=>"APP1",
-    "\xFF\xC1"=>"SOF1", # image data: extended sequential dct
-    "\xFF\xC2"=>"SOF2", # image data: progressive dct
-    "\xFF\xC4"=>"DHT", # image data: huffman table(s)
-    "\xFF\xDA"=>"SOS", # image data: start of scan
-    "\xFF\xDB"=>"DQT" # quantization tables
+    [0xFF,0xE0]=>"APP0",
+    [0xFF,0xE1]=>"APP1",
+    [0xFF,0xC1]=>"SOF1", # image data: extended sequential dct
+    [0xFF,0xC2]=>"SOF2", # image data: progressive dct
+    [0xFF,0xC4]=>"DHT", # image data: huffman table(s)
+    [0xFF,0xDA]=>"SOS", # image data: start of scan
+    [0xFF,0xDB]=>"DQT" # quantization tables
   }
-  PNG = "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
-  TIFF_MOTOROLA_BE = "\x4d\x4d\x00\x2a"
-  TIFF_INTEL_LE = "\x49\x49\x2a\x00"
+  PNG = [0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a] # "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
+  TIFF_MOTOROLA_BE = [0x4d,0x4d,0x00,0x2a] # "\x4d\x4d\x00\x2a"
+  TIFF_INTEL_LE = [0x49,0x49,0x2a,0x00] # "\x49\x49\x2a\x00"
 end
 end
 end

@@ -16,7 +16,7 @@ module Properties
     buf = ''
     src.read(2,buf)
     magic_bytes << buf
-    case magic_bytes
+    case magic_bytes.unpack('C*')
     when Cul::Image::Magic::BMP
       result = Cul::Image::Properties::Bmp.new(src)
     when Cul::Image::Magic::JPEG
@@ -26,7 +26,7 @@ module Properties
     if result.nil?
       src.read(2,buf)
       magic_bytes << buf
-      case magic_bytes
+      case magic_bytes.unpack('C*')
       when Cul::Image::Magic::TIFF_MOTOROLA_BE
         result = Cul::Image::Properties::Tiff.new(src)
       when Cul::Image::Magic::TIFF_INTEL_LE
@@ -38,10 +38,10 @@ module Properties
     if result.nil?
       src.read(4,buf)
       magic_bytes << buf
-      if magic_bytes == Cul::Image::Magic::PNG
+      if magic_bytes.unpack('C*') == Cul::Image::Magic::PNG
         result = Cul::Image::Properties::Png.new(src)
       else
-        puts magic_bytes.unpack('H2H2H2H2H2H2H2H2').inspect
+        puts "Unknown magic bytes: " + magic_bytes.unpack('H2H2H2H2H2H2H2H2').inspect
       end
     end
     return result

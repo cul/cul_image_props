@@ -35,6 +35,16 @@ xml
     @src.rewind
     @ng_xml = BASE_XML.clone
   end
+  # this is a hack to deal with Ruby 1.9 shenanigans
+  def ord_value(val)
+    if val.is_a? Fixnum
+      return val
+    elsif val.is_a? String
+      return val.unpack('C')[0]
+    else
+      return val.to_i
+    end
+  end
   def nodeset
     @ng_xml.root.element_children
   end
@@ -84,13 +94,21 @@ xml
   def extent=(value)
     add_dt_prop("dcmi", "extent", value)
   end
+  
+  def hex_inspect(str)
+    result = []
+    (0...str.length).each {|ix| result << str[ix].to_s(16)}
+    result.inspect
+  end
 end
 
 class Bmp < Base
   def initialize(srcfile=nil)
     super
     header_bytes = @src.read(18)
-    raise "Source file is not a bitmap" unless header_bytes[0...2] == Cul::Image::Magic::BMP
+    unless header_bytes[0...2].unpack('C*') == Cul::Image::Magic::BMP
+      raise "Source file is not a bitmap: #{hex_inspect(header_bytes[0...2])}"
+    end
     size = header_bytes[-4,4].unpack('V')[0]
     header_bytes = header_bytes + @src.read(size)
     dims = header_bytes[0x12...0x1a].unpack('VV')
@@ -108,7 +126,9 @@ class Gif < Base
   def initialize(srcfile=nil)
     super
     header_bytes = @src.read(13)
-    raise "Source file is not a gif" unless header_bytes[0...4] == Cul::Image::Magic::GIF
+    unless header_bytes[0...4].unpack('C*') == Cul::Image::Magic::GIF
+      raise "Source file is not a gif: #{hex_inspect(header_bytes[0...4])}"
+    end
     self.width= header_bytes[6,2].unpack('v')[0]
     self.length= header_bytes[8,2].unpack('v')[0]
     self.extent= srcfile.stat.size unless srcfile.nil?
@@ -119,14 +139,16 @@ class Jpeg < Base
   def initialize(srcfile=nil)
     super
     header_bytes = @src.read(2)
-    raise "Source file is not a jpeg" unless header_bytes[0...2] == Cul::Image::Magic::JPEG
+    unless header_bytes[0...2].unpack('C*') == Cul::Image::Magic::JPEG
+      raise "Source file is not a jpeg: #{hex_inspect(header_bytes[0...2])}"
+    end
     xpix = 0
     ypix = 0
     while (!@src.eof?)
-      if "\xFF" == @src.read(1)
-        mrkr = "\xFF" + @src.read(1)
+      if 0xff == ord_value(@src.read(1))
+        mrkr = [0xff, ord_value(@src.read(1))]
         blen = @src.read(2).unpack('n')[0]
-        if Cul::Image::Magic::JPEG_FRAME_MARKERS.include? mrkr  # SOFn, Start of frame for scans
+        if Cul::Image::Magic::JFM_BYTES.include? mrkr  # SOFn, Start of frame for scans
           @src.read(1) #skip bits per sample
           self.length= @src.read(2).unpack('n')[0]
           self.width= @src.read(2).unpack('n')[0]
@@ -170,7 +192,9 @@ class Png < Base
   def initialize(srcfile=nil)
     super
     header_bytes = @src.read(8)
-    raise "Source file is not a png" unless header_bytes[0...8] == Cul::Image::Magic::PNG
+    unless header_bytes[0...8].unpack('C*') == Cul::Image::Magic::PNG
+      raise "Source file is not a png #{hex_inspect(header_bytes[0...8])}"
+    end
     until @src.eof?
       clen = @src.read(4).unpack('N')[0]
       ctype = @src.read(4)
@@ -193,7 +217,7 @@ class Png < Base
     val = @src.read(9)
     xres = val[0,4].unpack('N')[0]
     yres = val[4,4].unpack('N')[0]
-    unit = val[8]
+    unit = ord_value(val[8])
     if unit == 1 # resolution unit is METER
       xres = (xres / 100).ceil
       yres = (yres / 100).ceil
@@ -277,13 +301,13 @@ class Tiff < Base
   def initialize(srcfile=nil)
     super
     header_bytes = @src.read(14)
-    case header_bytes[0...4]
+    case header_bytes[0...4].unpack('C*')
     when Cul::Image::Magic::TIFF_INTEL_LE
       @endian = header_bytes[12]
     when Cul::Image::Magic::TIFF_MOTOROLA_BE
       @endian = header_bytes[12]
     else
-      raise "Source file is not a tiff" 
+      raise "Source file is not a tiff #{hex_inspect(header_bytes[0...4])}" 
     end
     @src.rewind
     tags = Cul::Image::Properties::Exif.process_file(srcfile)
