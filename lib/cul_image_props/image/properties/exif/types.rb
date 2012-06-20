@@ -110,6 +110,7 @@ end
 
 # class that handles an EXIF header
 class EXIF_header
+    X00 = [0x00].pack('C')
     attr_accessor :tags
     def initialize(file, endian, offset, fake_exif, strict, detail=true)
         @file = file
@@ -158,7 +159,7 @@ class EXIF_header
         end
         # Sign extension ?
         if signed
-            msb= 1 << (8*length-1)
+            msb= 1 << (8*src.length-1)
             if val & msb
                 val=val-(msb << 1)
             end
@@ -178,19 +179,7 @@ class EXIF_header
           return 0
         end
         slice=@file.read(length)
-        if @endian == 'I'
-            val=s2n_intel(slice)
-        else
-            val=s2n_motorola(slice)
-        end
-        # Sign extension ?
-        if signed
-            msb= 1 << (8*length-1)
-            if val & msb
-                val=val-(msb << 1)
-            end
-        end
-        return val
+        return unpack_number(slice,signed)
     end
 
     # convert offset to string
@@ -298,7 +287,7 @@ class EXIF_header
                         values = @file.read(count)
                         #print values
                         # Drop any garbage after a null.
-                        values = values.split('\x00', 1)[0]
+                        values = values.split(X00, 1)[0]
                     else
                         values = ''
                     end
@@ -326,7 +315,7 @@ class EXIF_header
                 if count == 1 and field_type != 2
                     printable=values[0].to_s
                 elsif count > 50 and values.length > 20
-                    printable= "[" + values[0...20].join(',') + ", ... ]"
+                    printable= (field_type == 2) ? (values[0...20] + '...') : ("[" + values[0...20].join(',') + ", ... ]")
                 else
                     printable=values.inspect
                 end
@@ -364,13 +353,13 @@ class EXIF_header
         entries = self.s2n(thumb_ifd, 2)
         # this is header plus offset to IFD ...
         if @endian == 'M'
-            tiff = 'MM\x00*\x00\x00\x00\x08'
+            tiff = "MM#{X00}*" + [0x00,0x00,0x00,0x00,0x08].pack('C*')
         else
-            tiff = 'II*\x00\x08\x00\x00\x00'
+            tiff = 'II*' + [0x00,0x08,0x00,0x00,0x00].pack('C*')
         end
         # ... plus thumbnail IFD data plus a null "next IFD" pointer
         self.file.seek(self.offset+thumb_ifd)
-        tiff += self.file.read(entries*12+2)+'\x00\x00\x00\x00'
+        tiff += self.file.read(entries*12+2)+[0x00,0x00,0x00,0x00].pack('C*')
 
         # fix up large value offset pointers into data area
         (0...entries).each { |i|
