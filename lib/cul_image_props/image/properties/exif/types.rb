@@ -255,7 +255,7 @@ class EXIF_header
                 
                 # unknown field type
                 if 0 > field_type or field_type >= FIELD_TYPES.length
-                    if not self.strict
+                    if not @strict
                         next
                     else
                         raise format("unknown type %d in tag 0x%04X", field_type, tag)
