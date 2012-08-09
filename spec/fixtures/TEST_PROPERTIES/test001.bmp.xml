@@ -1,11 +1,11 @@
 <rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
- xmlns:si-assess="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/"
- xmlns:si-basic="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/"
+ xmlns:exif="http://www.w3.org/2003/12/exif/ns#"
  xmlns:dcmi="http://purl.org/dc/terms/">
-<si-assess:xSamplingFrequency>2925</si-assess:xSamplingFrequency>
-<si-assess:ySamplingFrequency>2925</si-assess:ySamplingFrequency>
-<si-assess:samplingFrequencyUnit rdf:resource="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/CentimeterSampling" />
-<si-basic:imageWidth>373</si-basic:imageWidth>
-<si-basic:imageLength>156</si-basic:imageLength>
+<exif:xResolution>2925</exif:xResolution>
+<exif:yResolution>2925</exif:yResolution>
+<exif:resolutionUnit>3</exif:resolutionUnit>
+<exif:imageWidth>373</exif:imageWidth>
+<exif:imageLength>156</exif:imageLength>
 <dcmi:extent>174858</dcmi:extent>
+<dcmi:format>image/bmp</dcmi:format>
 </rdf:Description>

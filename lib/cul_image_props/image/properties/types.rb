@@ -16,17 +16,15 @@ class Namespace
     @prefix
   end
 end
-
-ASSESS = Namespace.new("http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/","si-assess")
-BASIC = Namespace.new("http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/","si-basic")
+MIME = {:bmp => 'image/bmp', :gif=>'image/gif', :jpg=>'image/jpeg', :png=>'image/png', :tif => 'image/tiff'}
+EXIF = Namespace.new("http://www.w3.org/2003/12/exif/ns#","exif")
 DCMI = Namespace.new("http://purl.org/dc/terms/","dcmi")
-
+RESOLUTION_VALUES = [1,2,3] # 1 => Not absolute, 2=>inches,3=>centimeters
 class Base
   attr_accessor :nodeset
   BASE_XML = Nokogiri::XML.parse(<<-xml
 <rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
- xmlns:si-assess="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/"
- xmlns:si-basic="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/"
+ xmlns:exif="http://www.w3.org/2003/12/exif/ns#"
  xmlns:dcmi="http://purl.org/dc/terms/"></rdf:Description>
 xml
 )
@@ -68,32 +66,34 @@ xml
     @ng_xml.root.add_child( prop )
   end
 
-  def sampling_unit=(name)
-    prop = @ng_xml.create_element("samplingFrequencyUnit")
-    @ng_xml.root.namespace_definitions.each { |ns| prop.namespace = ns if ns.prefix == "si-assess" }
-    @ng_xml.root.add_child( prop )
-    prop.set_attribute("rdf:resource", prop.namespace.href + name)
+  def sampling_unit=(value)
+    raise "resolutionUnit values must be in the set #{RESOLUTION_VALUES.inspect}" unless RESOLUTION_VALUES.include? value
+    add_dt_prop("exif", "resolutionUnit", value)
   end
 
   def x_sampling_freq=(value)
-    add_dt_prop("si-assess", "xSamplingFrequency", value)
+    add_dt_prop("exif", "xResolution", value)
   end
 
   def y_sampling_freq=(value)
-    add_dt_prop("si-assess", "ySamplingFrequency", value)
+    add_dt_prop("exif", "yResolution", value)
   end
 
   def width=(value)
-    add_dt_prop("si-basic", "imageWidth", value)
+    add_dt_prop("exif", "imageWidth", value)
   end
 
   def length=(value)
-    add_dt_prop("si-basic", "imageLength", value)
+    add_dt_prop("exif", "imageLength", value)
   end
 
   def extent=(value)
     add_dt_prop("dcmi", "extent", value)
   end
+  
+  def format=(value)
+      add_dt_prop("dcmi", "format", value)
+    end
   
   def hex_inspect(str)
     result = []
@@ -113,9 +113,10 @@ class Bmp < Base
     header_bytes = header_bytes + @src.read(size)
     dims = header_bytes[0x12...0x1a].unpack('VV')
     sampling = header_bytes[0x26...0x2e].unpack('VV')
-    self.sampling_unit='CentimeterSampling'
+    self.sampling_unit=3
     self.width= dims[0]
     self.length= dims[1]
+    self.format= MIME[:bmp]
     self.extent= srcfile.stat.size unless srcfile.nil?
     self.x_sampling_freq= (sampling[0]) # / 100).ceil
     self.y_sampling_freq= (sampling[1]) # / 100).ceil
@@ -132,6 +133,7 @@ class Gif < Base
     self.width= header_bytes[6,2].unpack('v')[0]
     self.length= header_bytes[8,2].unpack('v')[0]
     self.extent= srcfile.stat.size unless srcfile.nil?
+    self.format= MIME[:gif]
   end
 end
 
@@ -177,14 +179,15 @@ class Jpeg < Base
     end
     if tags.include? 'Image ResolutionUnit'
       if (tags['Image ResolutionUnit'].values[0] == 3)
-        self.sampling_unit='CentimeterSampling'
+        self.sampling_unit=3
       elsif (tags['Image ResolutionUnit'].values[0] == 2)
-        self.sampling_unit='InchSampling'
+        self.sampling_unit=2
       else
-        self.sampling_unit='NoAbsoluteSampling'
+        self.sampling_unit=1
       end
     end
     self.extent= srcfile.stat.size unless srcfile.nil?
+    self.format= MIME[:jpg]
   end
 end
 
@@ -212,6 +215,7 @@ class Png < Base
       end
     end
     self.extent= srcfile.stat.size unless srcfile.nil?
+    self.format=MIME[:png]
   end
   def pHYs(len)
     val = @src.read(9)
@@ -221,9 +225,9 @@ class Png < Base
     if unit == 1 # resolution unit is METER
       xres = (xres / 100).ceil
       yres = (yres / 100).ceil
-      self.sampling_unit='CentimeterSampling'
+      self.sampling_unit=3
     else
-      self.sampling_unit='NoAbsoluteSampling'
+      self.sampling_unit=1
     end
     self.x_sampling_freq= xres
     self.y_sampling_freq= yres
@@ -325,15 +329,16 @@ class Tiff < Base
     end
     if tags.include? 'Image ResolutionUnit'
       if (tags['Image ResolutionUnit'].values[0] == 3)
-        self.sampling_unit='CentimeterSampling'
+        self.sampling_unit=3
       elsif (tags['Image ResolutionUnit'].values[0] == 2)
-        self.sampling_unit='InchSampling'
+        self.sampling_unit=2
       else
-        self.sampling_unit='NoAbsoluteSampling'
+        self.sampling_unit=1
       end
     end
     # do stuff with tags
     self.extent= srcfile.stat.size unless srcfile.nil?
+    self.format=MIME[:tif]
   end
 end
 

@@ -24,6 +24,7 @@ def compare_property_nodesets(expected, actual)
         end
       end
     }
+    puts "MISSING: #{n1.to_xml}" unless found
     found_all &&= found
   }
   unless found_all

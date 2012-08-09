@@ -82,27 +82,27 @@ describe "Cul::Image::Properties" do
             prop.should == '15138'
           end
           it "for length" do
-            prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageLength']
+            prop = @actual['http://www.w3.org/2003/12/exif/ns#imageLength']
             prop.nil?.should == false
             prop.should == '234'
           end
           it "for width" do
-            prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageWidth']
+            prop = @actual['http://www.w3.org/2003/12/exif/ns#imageWidth']
             prop.nil?.should == false
             prop.should == '313'
           end
           it "for sampling unit" do
-            prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/samplingFrequencyUnit']
+            prop = @actual['http://www.w3.org/2003/12/exif/ns#resolutionUnit']
             prop.nil?.should == false
-            prop.should == 'http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/NoAbsoluteSampling'
+            prop.should == '1'
           end
           it "for x sampling frequencies" do
-            prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/xSamplingFrequency']
+            prop = @actual['http://www.w3.org/2003/12/exif/ns#xResolution']
             prop.nil?.should == false
             prop.should == '72'
           end
           it "for y sampling frequencies" do
-            prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/ySamplingFrequency']
+            prop = @actual['http://www.w3.org/2003/12/exif/ns#yResolution']
             prop.nil?.should == false
             prop.should == '72'
           end
@@ -143,8 +143,8 @@ describe "Cul::Image::Properties" do
         prop = @actual['http://purl.org/dc/terms/extent']
         prop.nil?.should == false
         prop.should == '474706'
-        @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageWidth'].should == '492'
-        @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageLength'].should == '1392'
+        @actual['http://www.w3.org/2003/12/exif/ns#imageWidth'].should == '492'
+        @actual['http://www.w3.org/2003/12/exif/ns#imageLength'].should == '1392'
       end
     end
 
@@ -166,27 +166,27 @@ describe "Cul::Image::Properties" do
           prop.should == '5658702'
         end
         it "for length" do
-          prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageLength']
+          prop = @actual['http://www.w3.org/2003/12/exif/ns#imageLength']
           prop.nil?.should == false
           prop.should == '1470'
         end
         it "for width" do
-          prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/imageWidth']
+          prop = @actual['http://www.w3.org/2003/12/exif/ns#imageWidth']
           prop.nil?.should == false
           prop.should == '2085'
         end
         it "for sampling unit" do
-          prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/samplingFrequencyUnit']
+          prop = @actual['http://www.w3.org/2003/12/exif/ns#resolutionUnit']
           prop.nil?.should == false
-          prop.should == 'http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/InchSampling'
+          prop.should == '2'
         end
         it "for x sampling frequencies" do
-          prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/xSamplingFrequency']
+          prop = @actual['http://www.w3.org/2003/12/exif/ns#xResolution']
           prop.nil?.should == false
           prop.should == '600'
         end
         it "for y sampling frequencies" do
-          prop = @actual['http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/ySamplingFrequency']
+          prop = @actual['http://www.w3.org/2003/12/exif/ns#yResolution']
           prop.nil?.should == false
           prop.should == '600'
         end

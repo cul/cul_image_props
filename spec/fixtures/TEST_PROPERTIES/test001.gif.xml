@@ -1,8 +1,8 @@
 <rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
- xmlns:si-assess="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/ASSESSMENT/"
- xmlns:si-basic="http://purl.oclc.org/NET/CUL/RESOURCE/STILLIMAGE/BASIC/"
+ xmlns:exif="http://www.w3.org/2003/12/exif/ns#"
  xmlns:dcmi="http://purl.org/dc/terms/">
-<si-basic:imageWidth>492</si-basic:imageWidth>
-<si-basic:imageLength>1392</si-basic:imageLength>
+<exif:imageWidth>492</exif:imageWidth>
+<exif:imageLength>1392</exif:imageLength>
 <dcmi:extent>474706</dcmi:extent>
+<dcmi:format>image/gif</dcmi:format>
 </rdf:Description>
