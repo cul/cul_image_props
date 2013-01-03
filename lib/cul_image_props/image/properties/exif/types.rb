@@ -141,7 +141,7 @@ class EXIF_header
         x = 0
         l = src.length
         if l == 1
-          return src[0]
+          return src.unpack('C')[0]
         elsif l == 2
           return src.unpack('v')[0]
         elsif l == 4 

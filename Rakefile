@@ -5,15 +5,16 @@ Bundler::GemHelper.install_tasks
 Dir.glob('lib/tasks/*.rake').each { |r| import r }
 
 
-require 'spec/rake/spectask'
-Spec::Rake::SpecTask.new(:spec) do |spec|
-  spec.libs << 'lib' << 'spec'
-  spec.spec_files = FileList['spec/**/*_spec.rb']
+#require 'spec/rake/spectask'
+require 'rspec/core/rake_task'
+RSpec::Core::RakeTask.new(:spec) do |spec|
+  #spec.libs << 'lib' << 'spec'
+  spec.pattern = FileList['spec/**/*_spec.rb']
 end
 
-Spec::Rake::SpecTask.new(:rcov) do |spec|
-  spec.libs << 'lib' << 'spec'
-  spec.pattern = 'spec/**/*_spec.rb'
+RSpec::Core::RakeTask.new(:rcov) do |spec|
+  #spec.libs << 'lib' << 'spec'
+  spec.pattern = FileList['spec/**/*_spec.rb']
   spec.rcov = true
 end
 
@@ -21,7 +22,7 @@ end
 
 task :default => :spec
 
-require 'rake/rdoctask'
+require 'rdoc/task'
 Rake::RDocTask.new do |rdoc|
   version = Cul::Image::Properties::VERSION 
 

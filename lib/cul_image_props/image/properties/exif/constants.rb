@@ -10,7 +10,7 @@ def self.make_string(seq)
     seq.each { |c|
         # Screen out non-printing characters
         if 32 <= c and c < 256
-            str += chr(c)
+            str += c.chr
         end
     }
     # If no printing chars
