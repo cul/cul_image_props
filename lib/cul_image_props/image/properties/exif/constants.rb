@@ -7,12 +7,17 @@ module Exif
 # Don't throw an exception when given an out of range character.
 def self.make_string(seq)
     str = ''
-    seq.each { |c|
+    filter = Proc.new { |c|
         # Screen out non-printing characters
         if 32 <= c and c < 256
             str += c.chr
         end
     }
+    if seq.is_a? String
+      seq.each_byte &filter
+    else # must be a byte array, right?
+      seq.each &filter
+    end
     # If no printing chars
     if not str.length == 0
         return seq
