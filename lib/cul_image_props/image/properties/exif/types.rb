@@ -127,7 +127,7 @@ class EXIF_header
         x = 0
         l = src.length
         if l == 1
-          return src[0]
+          return src.unpack('C')[0]
         elsif l == 2
           return src.unpack('n')[0]
         elsif l == 4
@@ -284,10 +284,10 @@ class EXIF_header
                     # sometimes gets too big to fit in int value
                     if count != 0 and count < (2**31)
                         @file.seek(@offset + field_offset)
-                        values = @file.read(count)
+                        values = @file.read(count) # ascii string of count bytes
                         #print values
                         # Drop any garbage after a null.
-                        values = values.split(X00, 1)[0]
+                        values = values.split(X00, 1)[0] # a null-terminated string
                     else
                         values = ''
                     end
@@ -311,29 +311,33 @@ class EXIF_header
                         }
                     end
                 end
+                
                 # now 'values' is either a string or an array
-                if count == 1 and field_type != 2
-                    printable=values[0].to_s
-                elsif count > 50 and values.length > 20
-                    printable= (field_type == 2) ? (values[0...20] + '...') : ("[" + values[0...20].join(',') + ", ... ]")
-                else
-                    printable=values.inspect
-                end
                 # compute printable version of values
                 if tag_entry
                     if tag_entry.value
                         # optional 2nd tag element is present
                         if tag_entry.value.respond_to? :call
                             # call mapping function
+                            puts "tag_name: #{tag_name}"
+                            puts "field_type: #{field_type}"
+                            puts "count: #{count}"
                             printable = tag_entry.value.call(values)
+                            puts "printable: #{printable}"
                         else
                             printable = ''
                             values.each { |i|
                                 # use lookup table for this tag
-                                printable += (tag_entry.value.include? i)?tag_entry.value[i] : i.inspect
+                                printable += (tag_entry.value.include? i) ? tag_entry.value[i] : i.inspect
                             }
                         end
                      end
+                elsif count == 1 and field_type != 2
+                    printable=values[0].to_s
+                elsif count > 50 and values.length > 20
+                    printable= (field_type == 2) ? (values[0...20] + '...') : ("[" + values[0...20].join(',') + ", ... ]")
+                else
+                    printable=values.inspect
                 end
                 self.tags[ifd_name + ' ' + tag_name] = IFD_Tag.new(printable, tag_id,
                                                           field_type,

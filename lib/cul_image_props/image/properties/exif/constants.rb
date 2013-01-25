@@ -5,33 +5,45 @@ module Properties
 module Exif
 
 # Don't throw an exception when given an out of range character.
-def self.make_string(seq)
-    str = ''
-    filter = Proc.new { |c|
-        # Screen out non-printing characters
-        if 32 <= c and c < 256
-            str += c.chr
-        end
-    }
-    if seq.is_a? String
-      seq.each_byte &filter
-    else # must be a byte array, right?
-      seq.each &filter
+def self.ascii_bytes_to_filtered_string(seq)
+  if seq.is_a? String
+    seq = seq.unpack('C*')
+  end
+  str = ''
+  seq.each { |c|
+    # Screen out non-printing characters
+    unless c.is_a? Fixnum
+      raise "Expected an array of ASCII8BIT bytes, got an array value #{c.class}: #{field_type.inspect}"
     end
-    # If no printing chars
-    if not str.length == 0
-        return seq
+    if 32 <= c and c < 256
+      str += c.chr
     end
-    return str
+  }
+  return str
 end
 # Special version to deal with the code in the first 8 bytes of a user comment.
 # First 8 bytes gives coding system e.g. ASCII vs. JIS vs Unicode
-def self.make_string_uc(seq)
-    code = seq[0, 8]
-    seq = seq[8 ... seq.length]
-    # Of course, this is only correct if ASCII, and the standard explicitly
-    # allows JIS and Unicode.
-    return make_string(seq)
+def self.filter_encoded_string(seq)
+    if seq.is_a? String
+      bytes = seq.unpack('C*')
+    else # array of bytes
+      bytes = seq
+    end
+    code = bytes[0, 8]
+    seq = bytes[8 ... bytes.length].pack('C*')
+    if code == TAG_ENCODING[:ASCII]
+      return ascii_bytes_to_filtered_string(bytes[8 ... bytes.length])
+    end
+    if code == TAG_ENCODING[:UNICODE]
+      seq = seq.force_encoding('utf-8') # I see some docs indicating UCS-2 here?
+      return seq.gsub(/\p{Cntrl}/,'').gsub(/\P{ASCII}/,'')
+    end
+    if code == TAG_ENCODING[:JIS]
+      # to be implemented
+      return "JIS String Value"
+    end
+    # Fall back to ASCII
+    return ascii_bytes_to_filtered_string(bytes[8 ... bytes.length])
 end
 
 # decode Olympus SpecialMode tag in MakerNote
@@ -106,6 +118,12 @@ def self.nikon_ev_bias(seq)
     return ret_str
   end
 
+TAG_ENCODING =  {
+  :ASCII =>     [0x41, 0x53, 0x43, 0x49, 0x49, 0x00, 0x00, 0x00],
+  :JIS =>       [0x4A, 0x49, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00],
+  :UNICODE =>   [0x55, 0x4E, 0x49, 0x43, 0x4F, 0x44, 0x45, 0x00],
+  :UNDEFINED => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+}
 
 # field type descriptions as (length, abbreviation, full name) tuples
 FIELD_TYPES = [
@@ -181,7 +199,7 @@ EXIF_TAGS = {
     0x011A => TagName.new('XResolution'),
     0x011B => TagName.new('YResolution'),
     0x011C => TagName.new('PlanarConfiguration'),
-    0x011D => TagName.new('PageName', self.method(:make_string)),
+    0x011D => TagName.new('PageName', self.method(:ascii_bytes_to_filtered_string)),
     0x0128 => TagName.new('ResolutionUnit',
              { 1 => 'Not Absolute',
                2 => 'Pixels/Inch',
@@ -228,7 +246,7 @@ EXIF_TAGS = {
     0x8825 => TagName.new('GPSInfo'),
     0x8827 => TagName.new('ISOSpeedRatings'),
     0x8828 => TagName.new('OECF'),
-    0x9000 => TagName.new('ExifVersion', self.method(:make_string)),
+    0x9000 => TagName.new('ExifVersion', self.method(:ascii_bytes_to_filtered_string)),
     0x9003 => TagName.new('DateTimeOriginal'),
     0x9004 => TagName.new('DateTimeDigitized'),
     0x9101 => TagName.new('ComponentsConfiguration',
@@ -289,7 +307,7 @@ EXIF_TAGS = {
     0x920A => TagName.new('FocalLength'),
     0x9214 => TagName.new('SubjectArea'),
     0x927C => TagName.new('MakerNote'),
-    0x9286 => TagName.new('UserComment', self.method(:make_string_uc)),
+    0x9286 => TagName.new('UserComment', self.method(:filter_encoded_string)),
     0x9290 => TagName.new('SubSecTime'),
     0x9291 => TagName.new('SubSecTimeOriginal'),
     0x9292 => TagName.new('SubSecTimeDigitized'),
@@ -301,7 +319,7 @@ EXIF_TAGS = {
     0x9C9E => TagName.new('XPKeywords'),
     0x9C9F => TagName.new('XPSubject'),
 
-    0xA000 => TagName.new('FlashPixVersion', self.method(:make_string)),
+    0xA000 => TagName.new('FlashPixVersion', self.method(:ascii_bytes_to_filtered_string)),
     0xA001 => TagName.new('ColorSpace',
              {1 => 'sRGB',
               2 => 'Adobe RGB',
@@ -409,7 +427,7 @@ MAKERNOTE_OLYMPUS_TAGS = {
     0x0206 => TagName.new('LensDistortionParams'),
     0x0207 => TagName.new('SoftwareRelease'),
     0x0208 => TagName.new('PictureInfo'),
-    0x0209 => TagName.new('CameraID', self.method(:make_string)), # print as string
+    0x0209 => TagName.new('CameraID', self.method(:ascii_bytes_to_filtered_string)), # print as string
     0x0F00 => TagName.new('DataDump'),
     0x0300 => TagName.new('PreCaptureFrames'),
     0x0404 => TagName.new('SerialNumber'),
@@ -683,7 +701,7 @@ MAKERNOTE_CASIO_TAGS={
     }
 
 MAKERNOTE_FUJIFILM_TAGS={
-    0x0000 => TagName.new('NoteVersion', self.method(:make_string)),
+    0x0000 => TagName.new('NoteVersion', self.method(:ascii_bytes_to_filtered_string)),
     0x1000 => TagName.new('Quality'),
     0x1001 => TagName.new('Sharpness',
              {1 => 'Soft',
@@ -897,8 +915,8 @@ MAKERNOTE_CANON_TAG_0x004 = {
 
 # Nikon E99x MakerNote Tags
 MAKERNOTE_NIKON_NEWER_TAGS={
-    0x0001 => TagName.new('MakernoteVersion', self.method(:make_string)),	# Sometimes binary
-    0x0002 => TagName.new('ISOSetting', self.method(:make_string)),
+    0x0001 => TagName.new('MakernoteVersion', self.method(:ascii_bytes_to_filtered_string)),	# Sometimes binary
+    0x0002 => TagName.new('ISOSetting', self.method(:ascii_bytes_to_filtered_string)),
     0x0003 => TagName.new('ColorMode'),
     0x0004 => TagName.new('Quality'),
     0x0005 => TagName.new('Whitebalance'),

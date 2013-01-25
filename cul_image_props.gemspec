@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.email = %q{armintor@gmail.com}
   s.description = "Library for extracting basic image properties"
   s.summary = "Library for extracting basic image properties"
-
+  s.required_ruby_version = '>= 1.9.3'
   s.add_dependency('nokogiri')
   s.add_development_dependency "rake"
   s.add_development_dependency "rspec"
