@@ -74,23 +74,24 @@ def self.process_file(f, opts={})
                 end
                 exif = EXIF_TAGS[0x0128] # resolution unit
                 label = 'Image ' + exif.name
+                tag_name = nil
                 if (data[offset+11] == X00)
-                  jfif[label] = IFD_Tag.new(exif.value[1],label,3,[0],offset+11,1)
+                  tag_name = exif.value[1]
                 elsif (data[offset+11] == X01)
-                  jfif[label] = IFD_Tag.new(exif.value[2],label,3,[0],offset+11,1)
+                  tag_name = exif.value[2]
                 elsif (data[offset+11] == X02)
-                  jfif[label] = IFD_Tag.new(exif.value[3],label,3,[0],offset+11,1)
+                  tag_name = exif.value[3]
                 else
                   puts "Unknown jfif tag: #{data[offset+11]}"
-                  jfif[label] = IFD_Tag.new("Unknown",label,3,[0],offset+11,1)
+                  tag_name = "Unknown"
                 end
+                jfif[label] = IFD_Tag.new(tag_name,3,exif,[0],offset+11,1)
                 xres= data[offset+12,2].unpack('n')[0]
                 yres= data[offset+14,2].unpack('n')[0]
-                exif = EXIF_TAGS[0x011a] # x resolution
                 label = 'Image ' + EXIF_TAGS[0x011a].name
-                jfif[label] = IFD_Tag.new(xres.to_s,label,5,[xres],offset+12,2)
+                jfif[label] = IFD_Tag.new(xres.to_s,5,EXIF_TAGS[0x011a],[xres],offset+12,2)
                 label = 'Image ' + EXIF_TAGS[0x011b].name # y resolution
-                jfif[label] = IFD_Tag.new(yres.to_s,label,5,[yres],offset+13,2)
+                jfif[label] = IFD_Tag.new(yres.to_s,5,EXIF_TAGS[0x011b],[yres],offset+13,2)
             else
                 if(data.length < fptr + 2)
                     break

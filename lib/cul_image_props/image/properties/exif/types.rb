@@ -26,11 +26,31 @@ end
 
 # first element of tuple is tag name, optional second element is
 # another dictionary giving names to values
-class TagName
+class TagEntry
   attr_accessor :name, :value
   def initialize(name, value=false)
     @name = name
     @value = value
+  end
+
+  def translates?
+    return (not ( @value.nil? or @value == false ))
+  end
+
+  def translate(values)
+    if @value
+      if @value.respond_to? :call
+        # value was a proc
+        @value.call(values)
+      else
+        # value was a dictionary
+        trans = ''
+        values.each {|i| trans += (@value.include? i) ? @value[i] : i.inspect }
+        trans
+      end
+    else
+      values.inspect
+    end
   end
 end
 
@@ -38,7 +58,7 @@ class Ratio
     # ratio object that eventually will be able to reduce itself to lowest
     # common denominator for printing
     attr_accessor :num, :den
-    def gcd(a, b)
+    def self.gcd(a, b)
         if b == 1 or a == 1
             return 1
         elsif b == 0
@@ -62,7 +82,7 @@ class Ratio
     end
 
     def reduce
-        div = gcd(@num, @den)
+        div = Ratio.gcd(@num, @den)
         if div > 1
             @num = @num / div
             @den = @den / div
@@ -72,36 +92,52 @@ end
 
 # for ease of dealing with tags
 class IFD_Tag
-    attr_accessor :printable, :tag, :field_type, :values, :field_offset, :field_length
-    def initialize( printable, tag, field_type, values, field_offset, field_length)
-        # printable version of data
-        @printable = printable
+    attr_accessor :tag, :field_type, :values, :field_offset, :field_length
+    def initialize( tag_id, field_type, tag_entry, values, field_offset, count)
         # tag ID number
-        @tag = tag
+        @tag = tag_id
         # field type as index into FIELD_TYPES
         @field_type = field_type
+        # the TagEntry looked up for this tag_id
+        @tag_entry = tag_entry
         # offset of start of field in bytes from beginning of IFD
         @field_offset = field_offset
         # length of data field in bytes
-        @field_length = field_length
+        @count = count
+        typelen = FIELD_TYPES[@field_type].length
+        @field_length = count * typelen
         # either a string or array of data items
         @values = values
     end
 
+    def printable
+      @printable ||= begin
+        if @tag_entry.translates?
+          @tag_entry.translate @values
+        elsif @count == 1 and @field_type != 2
+            @values[0].to_s
+        elsif @count > 50 and @values.length > 20
+            (field_type == 2) ? (@values[0...20] + '...') : ("[" + @values[0...20].join(',') + ", ... ]")
+        else
+            @values.inspect
+        end
+      end
+    end
+
     def to_s
-        return @printable
+        printable
     end
 
     def inspect
         begin
             s= format("(0x%04X) %s=%s @ %d", @tag,
-                                        FIELD_TYPES[@field_type][2],
-                                        @printable,
+                                        FIELD_TYPES[@field_type].name,
+                                        printable,
                                         @field_offset)
         rescue
             s= format("(%s) %s=%s @ %s", @tag.to_s,
-                                        FIELD_TYPES[@field_type][2],
-                                        @printable,
+                                        FIELD_TYPES[@field_type].name,
+                                        printable,
                                         @field_offset.to_s)
         end
         return s
@@ -123,39 +159,39 @@ class EXIF_header
     end
 
 # extract multibyte integer in Motorola format (big/network endian)
-    def s2n_motorola(src)
-        x = 0
-        l = src.length
-        if l == 1
-          return src.unpack('C')[0]
-        elsif l == 2
-          return src.unpack('n')[0]
-        elsif l == 4
-          return src.unpack('N')[0]
-        else
-          raise "Unexpected packed Fixnum length: " + l.to_s
-        end
+    def self.s2n_motorola(src)
+      x = 0
+      l = src.bytesize
+      if l == 1
+        return src.unpack('C')[0]
+      elsif l == 2
+        return src.unpack('n')[0]
+      elsif l == 4
+        return src.unpack('N')[0]
+      else
+        raise "Unexpected packed Fixnum length: " + l.to_s
+      end
     end
 # extract multibyte integer in Intel format (little endian)
-    def s2n_intel(src)
-        x = 0
-        l = src.length
-        if l == 1
-          return src.unpack('C')[0]
-        elsif l == 2
-          return src.unpack('v')[0]
-        elsif l == 4 
-          return src.unpack('V')[0]
-        else
-          raise "Unexpected packed Fixnum length: " + l.to_s
-        end
+    def self.s2n_intel(src)
+      x = 0
+      l = src.bytesize
+      if l == 1
+        return src.unpack('C')[0]
+      elsif l == 2
+        return src.unpack('v')[0]
+      elsif l == 4 
+        return src.unpack('V')[0]
+      else
+        raise "Unexpected packed Fixnum length: " + l.to_s
       end
+    end
 
     def unpack_number(src, signed=false)
         if @endian == 'I'
-            val=s2n_intel(src)
+            val = EXIF_header.s2n_intel(src)
         else
-            val=s2n_motorola(src)
+            val = EXIF_header.s2n_motorola(src)
         end
         # Sign extension ?
         if signed
@@ -239,12 +275,7 @@ class EXIF_header
             tag_id = unpack_number(@file.read(2))
 
             # get tag name early to avoid errors, help debug
-            tag_entry = dict[tag_id]
-            if tag_entry
-                tag_name = tag_entry.name
-            else
-                tag_name = 'Tag 0x%04X' % tag_id
-            end
+            tag_entry = dict[tag_id] || TagEntry.new('Tag 0x%04X' % tag_id)
 
             # ignore certain tags for faster processing
             if not (not @detail and IGNORE_TAGS.include? tag_id)
@@ -261,7 +292,7 @@ class EXIF_header
                         raise format("unknown type %d in tag 0x%04X", field_type, tag)
                     end
                 end
-                typelen = FIELD_TYPES[field_type][0]
+                typelen = FIELD_TYPES[field_type].length
                 count = unpack_number(@file.read(4))
 
                 # If the value exceeds 4 bytes, it is a pointer to values.
@@ -297,7 +328,7 @@ class EXIF_header
                     
                     # @todo investigate
                     # some entries get too big to handle could be malformed file
-                    if count < 1000 or tag_name == 'MakerNote'
+                    if count < 1000 or tag_entry.name == 'MakerNote'
                         @file.seek(@offset + field_offset)
                         count.times {
                             if field_type == 5 or field_type == 10
@@ -312,39 +343,12 @@ class EXIF_header
                     end
                 end
                 
-                # now 'values' is either a string or an array
-                # compute printable version of values
-                if tag_entry
-                    if tag_entry.value
-                        # optional 2nd tag element is present
-                        if tag_entry.value.respond_to? :call
-                            # call mapping function
-                            puts "tag_name: #{tag_name}"
-                            puts "field_type: #{field_type}"
-                            puts "count: #{count}"
-                            printable = tag_entry.value.call(values)
-                            puts "printable: #{printable}"
-                        else
-                            printable = ''
-                            values.each { |i|
-                                # use lookup table for this tag
-                                printable += (tag_entry.value.include? i) ? tag_entry.value[i] : i.inspect
-                            }
-                        end
-                     end
-                elsif count == 1 and field_type != 2
-                    printable=values[0].to_s
-                elsif count > 50 and values.length > 20
-                    printable= (field_type == 2) ? (values[0...20] + '...') : ("[" + values[0...20].join(',') + ", ... ]")
-                else
-                    printable=values.inspect
-                end
-                self.tags[ifd_name + ' ' + tag_name] = IFD_Tag.new(printable, tag_id,
-                                                          field_type,
+                self.tags[ifd_name + ' ' + tag_entry.name] = IFD_Tag.new(tag_id,
+                                                          field_type, tag_entry,
                                                           values, field_offset,
-                                                          count * typelen)
+                                                          count)
             end
-            if tag_name == stop_tag
+            if tag_entry.name == stop_tag
                 break
             end
         }
@@ -370,7 +374,7 @@ class EXIF_header
             entry = thumb_ifd + 2 + 12 * i
             tag = self.s2n(entry, 2)
             field_type = self.s2n(entry+2, 2)
-            typelen = FIELD_TYPES[field_type][0]
+            typelen = FIELD_TYPES[field_type].length
             count = self.s2n(entry+4, 4)
             oldoff = self.s2n(entry+8, 4)
             # start of the 4-byte pointer area in entry
