@@ -4,11 +4,12 @@ module Properties
 module Exif
 
 class FieldType
-  attr_accessor :length, :abbreviation, :name
-  def initialize(length, abb, name)
+  attr_accessor :length, :abbreviation, :name, :signed
+  def initialize(length, abb, name, signed=false)
     @length = length
     @abbreviation = abb
     @name = name
+    @signed = signed
   end
   def [](index)
     case index
@@ -148,6 +149,7 @@ end
 class EXIF_header
     X00 = [0x00].pack('C')
     attr_accessor :tags
+    attr_reader :endian, :offset
     def initialize(file, endian, offset, fake_exif, strict, detail=true)
         @file = file
         @endian = endian
@@ -293,6 +295,7 @@ class EXIF_header
                     end
                 end
                 typelen = FIELD_TYPES[field_type].length
+                signed = FIELD_TYPES[field_type].signed
                 count = unpack_number(@file.read(4))
 
                 # If the value exceeds 4 bytes, it is a pointer to values.
@@ -324,7 +327,6 @@ class EXIF_header
                     end
                 else
                     values = []
-                    signed = [6, 8, 9, 10].include? field_type
                     
                     # @todo investigate
                     # some entries get too big to handle could be malformed file
@@ -342,6 +344,10 @@ class EXIF_header
                         }
                     end
                 end
+            if (tag_id == 0x8769)
+                puts "tag_id #{tag_id} field_type #{field_type} count #{count} values #{values.inspect}"
+
+            end
                 
                 self.tags[ifd_name + ' ' + tag_entry.name] = IFD_Tag.new(tag_id,
                                                           field_type, tag_entry,

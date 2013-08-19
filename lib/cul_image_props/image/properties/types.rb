@@ -100,6 +100,10 @@ xml
     (0...str.length).each {|ix| result << str[ix].to_s(16)}
     result.inspect
   end
+
+  def inspect
+    @ng_xml.to_s
+  end
 end
 
 class Bmp < Base

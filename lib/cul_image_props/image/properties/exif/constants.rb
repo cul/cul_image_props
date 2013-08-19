@@ -133,11 +133,11 @@ FIELD_TYPES = [
     FieldType.new(2, 'S', 'Short'),
     FieldType.new(4, 'L', 'Long'),
     FieldType.new(8, 'R', 'Ratio'),
-    FieldType.new(1, 'SB', 'Signed Byte'),
+    FieldType.new(1, 'SB', 'Signed Byte', true),
     FieldType.new(1, 'U', 'Undefined'),
-    FieldType.new(2, 'SS', 'Signed Short'),
-    FieldType.new(4, 'SL', 'Signed Long'),
-    FieldType.new(8, 'SR', 'Signed Ratio')
+    FieldType.new(2, 'SS', 'Signed Short', true),
+    FieldType.new(4, 'SL', 'Signed Long', true),
+    FieldType.new(8, 'SR', 'Signed Ratio', true)
     ]
 
 # dictionary of main EXIF tag names

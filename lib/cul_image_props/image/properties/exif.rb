@@ -150,18 +150,20 @@ def self.process_file(f, opts={})
         hdr.dump_IFD(i, ifd_name, {:dict=>EXIF_TAGS, :relative=>false, :stop_tag=>stop_tag})
         # EXIF IFD
         exif_off = hdr.tags[ifd_name +' ExifOffset']
-        if exif_off
+        if exif_off and exif_off.values[0] < f.size
             hdr.dump_IFD(exif_off.values[0], 'EXIF', {:dict=>EXIF_TAGS, :relative=>false, :stop_tag =>stop_tag})
             # Interoperability IFD contained in EXIF IFD
             intr_off = hdr.tags['EXIF SubIFD InteroperabilityOffset']
             if intr_off
+                puts "INTEROP OFFSET"
                 hdr.dump_IFD(intr_off.values[0], 'EXIF Interoperability',
                              :dict=>INTR_TAGS, :relative=>false, :stop_tag =>stop_tag)
             end
         end
         # GPS IFD
         gps_off = hdr.tags[ifd_name+' GPSInfo']
-        if gps_off
+        if gps_off and gps_off.values[0] < f.size
+            puts "GPSINFO"
             hdr.dump_IFD(gps_off.values[0], 'GPS', {:dict=>GPS_TAGS, :relative=>false, :stop_tag =>stop_tag})
         end
         ctr += 1
