@@ -407,8 +407,6 @@ IGNORE_TAGS = [0x9286, 0x927C]
 
 
 MAKERNOTE_OLYMPUS_TAGS = {
-    # ah HAH! those sneeeeeaky bastids! this is how they get past the fact
-    # that a JPEG thumbnail is not allowed in an uncompressed TIFF file
     0x0100 => TagEntry.new('JPEGThumbnail'),
     0x0200 => TagEntry.new('SpecialMode', self.method(:olympus_special_mode)),
     0x0201 => TagEntry.new('JPEGQual',
@@ -435,7 +433,6 @@ MAKERNOTE_OLYMPUS_TAGS = {
     0x1001 => TagEntry.new('ISOValue'),
     0x1002 => TagEntry.new('ApertureValue'),
     0x1003 => TagEntry.new('BrightnessValue'),
-    0x1004 => TagEntry.new('FlashMode'),
     0x1004 => TagEntry.new('FlashMode',
        {2 => 'On',
         3 => 'Off'}),
@@ -484,8 +481,6 @@ MAKERNOTE_OLYMPUS_TAGS = {
     0x103b => TagEntry.new('InfinityLensStep'),
     0x103c => TagEntry.new('NearLensStep'),
 
-    # TODO - these need extra definitions
-    # http =>//search.cpan.org/src/EXIFTOOL/Image-ExifTool-6.90/html/TagNames/Olympus.html
     0x2010 => TagEntry.new('Equipment'),
     0x2020 => TagEntry.new('CameraSettings'),
     0x2030 => TagEntry.new('RawDevelopment'),
